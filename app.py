@@ -16,7 +16,7 @@ app = Dash()
 #App layout
 app.layout = [
     html.Div(children='Test'),
-    #html.Hr(),
+    html.Hr(),
     dcc.RadioItems(options=['Gender','treatment', 'family_history'], value='Gender', id='controls-and-radio-items'),
     dash_table.DataTable(data=df.to_dict('records'), page_size=6),
     dcc.Graph(figure={}, id='controls-and-graph')
