@@ -68,10 +68,24 @@ def update_percentages_map(dropdown_value):
     # Merge the dataframe with the world GeoDataFrame
     world = world.merge(data, how='left', left_on='name', right_on=COUNTRY_COL)
 
+    # Set legend range
+    if min(world[dropdown_value].values) < 0.5:
+        min_legend_range = 0
+    else:
+        min_legend_range = 0.5
+    
+    min_dropdown_value = world[dropdown_value].min()
+    max_dropdown_value = world[dropdown_value].max()
+    min_legend_range = 0 if min_dropdown_value < 0.25 else \
+        (0.25 if 0.25 <= min_dropdown_value < 0.5 else 0.5)
+    max_legend_range = 0.5 if max_dropdown_value < 0.5 else \
+        (0.75 if 0.5 <= max_dropdown_value <= 0.75 else 1)
+
     fig = px.choropleth(
         world, locations='iso_a3', color=dropdown_value,
         hover_name=COUNTRY_COL, hover_data=[COUNTRY_COL, dropdown_value, 'continent', 'pop_est'],
-        color_continuous_scale=px.colors.sequential.Viridis_r
+        color_continuous_scale=px.colors.sequential.Viridis_r,
+        # range_color=(min_legend_range, max_legend_range) # Inspired from https://community.plotly.com/t/fixed-legend-for-animation/56167
     )
     fig.update_layout(
         title=dict(text=f"{dropdown_value.title()} (%) per Country", 
