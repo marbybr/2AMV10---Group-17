@@ -3,6 +3,7 @@
 #pip install dash-bootstrap-components
 #pip install pandas
 
+import numpy as np
 from dash import Dash, html, dash_table, dcc, callback, Output, Input
 import pandas as pd
 from sklearn.manifold import TSNE
@@ -29,6 +30,21 @@ def group_by_country(df: pd.DataFrame, col: str):
         return df_grouped
     
     return inner
+
+def find_closest(num, find_min=True, num_list=np.linspace(0, 1, 51)):
+    """
+    Find the closest number to a given percentage (between 0 and 1) that is smaller than that
+    percentage (find_min=True) or greater than that percentage (find_min=False)
+    """
+    for i, num_ in enumerate(num_list):
+        if find_min:
+            lb = num_list[max(i-1, 0)]
+            if lb >= num:
+                return lb
+        else:
+            ub = num_
+            if ub >= num:
+                return ub
 
 # Create app layout
 app = Dash()
@@ -67,31 +83,36 @@ def update_percentages_map(dropdown_value):
 
     # Merge the dataframe with the world GeoDataFrame
     world = world.merge(data, how='left', left_on='name', right_on=COUNTRY_COL)
-
-    # Set legend range
-    if min(world[dropdown_value].values) < 0.5:
-        min_legend_range = 0
-    else:
-        min_legend_range = 0.5
     
-    min_dropdown_value = world[dropdown_value].min()
-    max_dropdown_value = world[dropdown_value].max()
-    min_legend_range = 0 if min_dropdown_value < 0.25 else \
-        (0.25 if 0.25 <= min_dropdown_value < 0.5 else 0.5)
-    max_legend_range = 0.5 if max_dropdown_value < 0.5 else \
-        (0.75 if 0.5 <= max_dropdown_value <= 0.75 else 1)
+    min_dropdown_value = find_closest(world[dropdown_value].min(), True)
+    max_dropdown_value = find_closest(world[dropdown_value].max(), False)
+    # min_legend_range = 0 if min_dropdown_value < 0.25 else \
+    #     (0.25 if 0.25 <= min_dropdown_value < 0.5 else 0.5)
+    # max_legend_range = 0.5 if max_dropdown_value < 0.5 else \
+    #     (0.75 if 0.5 <= max_dropdown_value <= 0.75 else 1)
 
     fig = px.choropleth(
         world, locations='iso_a3', color=dropdown_value,
         hover_name=COUNTRY_COL, hover_data=[COUNTRY_COL, dropdown_value, 'continent', 'pop_est'],
         color_continuous_scale=px.colors.sequential.Viridis_r,
-        # range_color=(min_legend_range, max_legend_range) # Inspired from https://community.plotly.com/t/fixed-legend-for-animation/56167
+        range_color=(min_dropdown_value, max_dropdown_value) # Inspired from https://community.plotly.com/t/fixed-legend-for-animation/56167
     )
+    # fig.update_layout(
+    #     title=dict(text=f"{dropdown_value.title()} (%) per Country", 
+    #                font=dict(size=30), automargin=True, yref='container',
+    #                y=0.95)
+    # ) # Inspired from https://plotly.com/python/figure-labels/
+
     fig.update_layout(
-        title=dict(text=f"{dropdown_value.title()} (%) per Country", 
+        title=dict(text=f"{dropdown_value.title()} (%) per Country",
                    font=dict(size=30), automargin=True, yref='container',
-                   y=0.95)
-    ) # Inspired from https://plotly.com/python/figure-labels/
+                   y=0.95), # Inspired from https://plotly.com/python/figure-labels/
+        coloraxis_colorbar=dict(
+            title=dict(font=dict(size=25)),  # Increase legend title font size
+            tickfont=dict(size=20)  # Increase tick labels font size
+        )
+    )
+
 
     return fig
 
