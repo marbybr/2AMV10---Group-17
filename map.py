@@ -65,7 +65,7 @@ app.layout = html.Div([
 
     # Figure -- Map
     dcc.Graph(id='percentages_map', clear_on_unhover=True, 
-              style={'width': '90vw', 'height': '80vh', 'display': 'inline-block'}),
+              style={'width': '70vw', 'height': '70vh', 'display': 'inline-block'}),
     
     # Figure -- Bar plot
     dcc.Graph(id='country_barplot', clear_on_unhover=True, style={'display': 'inline-block'}),
@@ -122,11 +122,33 @@ def update_percentages_map(dropdown_value):
 # Callback for updating histogram
 @app.callback(
     Output(component_id="country_barplot", component_property="figure"),
-    Input(component_id="percentages_map", component_property="hoverData")
+    Input(component_id="percentages_map", component_property="hoverData"),
+    Input(component_id='columns_dropdown', component_property='value')
 )
 
-def update_barplot(hoverDataMap):
-    print(hoverDataMap['hovertext'])
+def update_barplot(hoverDataMap, dropdown_value):
+
+    country = "United States of America"
+    if hoverDataMap:
+        country = hoverDataMap['points'][0]['customdata'][0]
+    data = df.loc[df[COUNTRY_COL].isin([country]), :]
+
+    # Load world map from Geopandas datasets
+    world = gpd.read_file(gpd.datasets.get_path('naturalearth_lowres'))
+
+    # Merge the dataframe with the world GeoDataFrame
+    world = world.merge(data, how='left', left_on='name', right_on=COUNTRY_COL)
+
+    fig = px.histogram(data_frame=world, x=dropdown_value, color=dropdown_value,
+                       hover_name=COUNTRY_COL, 
+                       hover_data=[COUNTRY_COL, dropdown_value, 'continent', 'pop_est'])
+    fig.update_layout(
+        title=dict(text=f"{dropdown_value} in {country}",
+                   font=dict(size=30), automargin=True, yref='container',
+                   y=0.95), # Inspired from https://plotly.com/python/figure-labels/
+    )
+    return fig
+    
 
 # Run app
 if __name__ == '__main__':
