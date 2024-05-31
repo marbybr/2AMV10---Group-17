@@ -6,7 +6,7 @@ import plotly.express as px
 import dash_bootstrap_components as dbc
 
 # Load the dataset
-df = pd.read_csv(r'C:\Users\Shang\OneDrive\Escritorio\visualAnalytics\project\data_cleaned.csv')
+df = pd.read_csv(r'data_cleaned.csv')
 
 # Set default name for `Country column`
 COUNTRY_COL = "Country"

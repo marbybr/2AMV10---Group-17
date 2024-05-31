@@ -65,7 +65,10 @@ app.layout = html.Div([
 
     # Figure -- Map
     dcc.Graph(id='percentages_map', clear_on_unhover=True, 
-              style={'width': '90vw', 'height': '80vh', 'display': 'inline-block'})
+              style={'width': '90vw', 'height': '80vh', 'display': 'inline-block'}),
+    
+    # Figure -- Bar plot
+    dcc.Graph(id='country_barplot', clear_on_unhover=True, style={'display': 'inline-block'}),
 ])
 
 # Define callback function for updating map display
@@ -115,6 +118,15 @@ def update_percentages_map(dropdown_value):
 
 
     return fig
+
+# Callback for updating histogram
+@app.callback(
+    Output(component_id="country_barplot", component_property="figure"),
+    Input(component_id="percentages_map", component_property="hoverData")
+)
+
+def update_barplot(hoverDataMap):
+    print(hoverDataMap['hovertext'])
 
 # Run app
 if __name__ == '__main__':
