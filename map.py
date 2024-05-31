@@ -144,8 +144,8 @@ def update_barplot(hoverDataMap, dropdown_value):
                        hover_data=[COUNTRY_COL, dropdown_value, 'continent', 'pop_est'])
     fig.update_layout(
         title=dict(text=f"{dropdown_value} in {country}",
-                   font=dict(size=30), automargin=True, yref='container',
-                   y=0.95), # Inspired from https://plotly.com/python/figure-labels/
+                   font=dict(size=20), automargin=True, yref='container',
+                   y=1.0), # Inspired from https://plotly.com/python/figure-labels/
     )
     return fig
     
