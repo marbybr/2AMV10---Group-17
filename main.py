@@ -23,7 +23,7 @@ app.title = "Mental Health Dataset Analysis"
 
 # App layout
 app.layout = dbc.Container([
-    #Construct the title
+    #Construct the title and subtitles
     dbc.Row([
         html.Div('Mental Health Dataset Analysis', style={
             'fontSize': '36px', 
@@ -33,14 +33,17 @@ app.layout = dbc.Container([
         })
     ]),
 
-    # Construct the subtitle
     dbc.Row([
-        html.Div('Initial version of our dash application', style={
+        html.Div('Multiple Features Selection', style={
             'fontSize': '24px', 
             'fontWeight': 'normal', 
             'textAlign': 'center', 
             'marginBottom': '20px'
         })
+    ]),
+
+    dbc.Row([
+        html.Div('Select features for analysis in the dropdown menu below')
     ]),
 
     #Construct the dropdown menu of all columns except for index and Timestamp, 
@@ -54,19 +57,23 @@ app.layout = dbc.Container([
     dbc.Row([
         #Show the Time, treatment and history features of the first 10 rows the the dataset (probably not needed in final product)
         dbc.Col([
-            dash_table.DataTable(data=df[['Timestamp', 'family_history', 'treatment']].to_dict('records'), page_size=10, id='table'),
-            html.Br(),
-            dcc.Dropdown([f"{col}{sign}" for col in df.columns[1:] for sign in [' = True', ' = False']], id='filter', multi=True)
-        ], width=6),
+            html.Div(style={'height': '20px'}),
+            html.Div('Select features you would like to view in the table in the dropdown menu below'),
+            dcc.Dropdown(df.columns, ['Timestamp', 'family_history', 'treatment'], id='table-feature-selection', multi=True),
+            dash_table.DataTable(page_size=10, id='table', style_table={'overflowX': 'auto'}),
+            html.Div('The dropdown menu below can be used to filter the dataset'),
+            dcc.Dropdown([f"{col}{sign}" for col in df.columns[1:] for sign in [' = True', ' = False']], id='filter-dropdown', multi=True)
+            
+        ], width=5),
         #Show a simple histogram for the selected feature
         dbc.Col([
             dcc.Graph(figure={}, id='feature-distribution')
-        ], width=6)
+        ], width=7)
     ]),
     
     #Construct the subtitle
     dbc.Row([
-        html.Div('Select feature per country', style={
+        html.Div('Feature Selection per country', style={
             'fontSize': '24px', 
             'fontWeight': 'normal', 
             'textAlign': 'center', 
@@ -100,9 +107,11 @@ app.layout = dbc.Container([
 @app.callback(
     Output(component_id='feature-dropdown-container', component_property='children'),
     Output(component_id='feature-distribution', component_property='figure'),
+    Output(component_id='table', component_property='data'),
+    Input(component_id='table-feature-selection', component_property='value'),
     Input(component_id='feature-dropdown', component_property='value'),
-) 
-
+    Input(component_id='filter-dropdown', component_property='value')
+)
 def update_values(table_features, selected_features, filters):
 
     #Generate the text message that shows which features were selected
@@ -120,7 +129,6 @@ def update_values(table_features, selected_features, filters):
             else:
                 filter_value = False
             df_filtered = df_filtered[df_filtered[filter_column] == filter_value]
-
 
     #If no features were selected, return an empty figure
     if len(selected_features) == 0:
@@ -140,25 +148,20 @@ def update_values(table_features, selected_features, filters):
 
     fig = go.Figure()
     legend_check = True
-    
+
     for _, row in count_data.iterrows():
         fig.add_trace(go.Bar(
             x=[row['variable']],
             y=[row['count_0']],
-            name="False",
-            marker_color='red',
-            showlegend = legend_check,
-            width=0.25
+            name=f"{row['variable']} = 0",
+            marker_color='blue'
             ))
         fig.add_trace(go.Bar(
             x=[row['variable']],
             y=[row['count_1']],
-            name="True",
-            marker_color='green',
-            showlegend = legend_check,
-            width=0.25
+            name=f"{row['variable']} = 1",
+            marker_color='orange'
             ))
-        legend_check = False
     
     # Update layout
     fig.update_layout(
