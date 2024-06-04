@@ -47,7 +47,8 @@ def find_closest(num, find_min=True, num_list=np.linspace(0, 1, 51)):
                 return ub
 
 # Create app layout
-app = Dash()
+external_stylesheets = [dbc.themes.SLATE]
+app = Dash(external_stylesheets=external_stylesheets)
 app.title = "Mental Health Dataset Analysis"
 
 app.layout = html.Div([
