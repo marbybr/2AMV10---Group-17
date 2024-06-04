@@ -21,7 +21,7 @@ app = Dash(__name__, external_stylesheets=external_stylesheets)
 app.layout = dbc.Container([
     #Construct the title
     dbc.Row([
-        html.Div('Initial version of our dash application')
+        html.Div('Select features for analysis in the dropdown menu below')
     ]),
 
     #Construct the dropdown menu of all columns except for index and Timestamp, 
@@ -35,29 +35,32 @@ app.layout = dbc.Container([
     dbc.Row([
         #Show the Time, treatment and history features of the first 10 rows the the dataset (probably not needed in final product)
         dbc.Col([
-            dash_table.DataTable(data=df[['Timestamp', 'family_history', 'treatment']].to_dict('records'), page_size=10, id='table')
-        ], width=4),
+            html.Div(style={'height': '20px'}),
+            html.Div('Select features you would like to view in the table in the dropdown menu below'),
+            dcc.Dropdown(df.columns, ['Timestamp', 'family_history', 'treatment'], id='table-feature-selection', multi=True),
+            dash_table.DataTable(page_size=10, id='table', style_table={'overflowX': 'auto'}),
+            html.Div('The dropdown menu below can be used to filter the dataset'),
+            dcc.Dropdown([f"{col}{sign}" for col in df.columns[1:] for sign in [' = True', ' = False']], id='filter-dropdown', multi=True)
+            
+        ], width=5),
         #Show a simple histogram for the selected feature
         dbc.Col([
             dcc.Graph(figure={}, id='feature-distribution')
-        ], width=8)
+        ], width=7)
     ]),
-    
-    dbc.Row([
-        dcc.Dropdown([f"{col}{sign}" for col in df.columns[1:] for sign in [' = True', ' = False']], id='filter-dropdown', multi=True),
-    ])
-
 ])
 
 #Builds interaction between the displayed text below the dropdown menu and the graph
 @callback(
     Output(component_id='feature-dropdown-container', component_property='children'),
     Output(component_id='feature-distribution', component_property='figure'),
+    Output(component_id='table', component_property='data'),
+    Input(component_id='table-feature-selection', component_property='value'),
     Input(component_id='feature-dropdown', component_property='value'),
     Input(component_id='filter-dropdown', component_property='value')
 )
 
-def update_values(selected_features, filters):
+def update_values(table_features, selected_features, filters):
 
     #Generate the text message that shows which features were selected
     if type(selected_features) == str:
@@ -128,7 +131,9 @@ def update_values(selected_features, filters):
     )
     fig.update_yaxes(range=[0, 1])
 
-    return printed_text, fig
+    table = df_filtered[table_features].to_dict('records')
+
+    return printed_text, fig, table
 
 
 if __name__ == '__main__':
