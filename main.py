@@ -286,9 +286,7 @@ def update_barplot(hoverDataMap, dropdown_value):
             text=f"{dropdown_value}",
             font=dict(size=16)
         ),
-        # plot_bgcolor='rgba(0, 0, 0, 0)',
-        # paper_bgcolor='rgba(0, 0, 0, 0)',
-        font=dict(color='black'), #white
+        font=dict(color='black'), 
         xaxis=dict(
             showgrid=False,
             zeroline=False,
