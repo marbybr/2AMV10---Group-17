@@ -13,8 +13,14 @@ import os
 #Load the dataset
 df = pd.read_csv('data_cleaned.csv')
 
+# Map Mental_Health_History to numeric
+df["Mental_Health_History"] = df["Mental_Health_History"].map({"No": 0, "Maybe": 1, "Yes": 2})
+
 # Set default name for `Country` column
 COUNTRY_COL = "Country"
+
+# Specify the columns you want to include in the dropdown
+target_columns = ['family_history', 'treatment', 'Mental_Health_History']
 
 #Initialize the app and incorporate a Dash Bootstrap theme
 external_stylesheets = [dbc.themes.SLATE] #[dbc.themes.BOOTSTRAP]
@@ -85,7 +91,7 @@ app.layout = dbc.Container([
     #Construct the drop down menu for the map visualization and the histogram
     dbc.Row([
         dcc.Dropdown(id='columns_dropdown',
-                        options=[{'label': column, 'value': column} for column in df.columns if column not in ['Timestamp', "Country"]],
+                        options=[{'label': column, 'value': column} for column in target_columns if column not in ['Timestamp', "Country"]],
                         value='treatment',
                         style={'width':'100%'}
             ) #Dropdown
