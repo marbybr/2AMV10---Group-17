@@ -46,10 +46,10 @@ app.layout = dbc.Container([
         html.Div('Select features for analysis in the dropdown menu below')
     ]),
 
-    #Construct the dropdown menu of all columns except for index and Timestamp, 
+    #Construct the dropdown menu of all columns except for index, Timestamp and country, 
     #set the 2nd column (so first after index and Timestamp) as the standard selected option
     dbc.Row([
-        dcc.Dropdown(df.columns[1:], df.columns[1], id='feature-dropdown', multi=True),
+        dcc.Dropdown(df.columns[1:].drop(['Country']), df.columns[1], id='feature-dropdown', multi=True),
         html.Div(id='feature-dropdown-container')
     ]),
 
@@ -103,24 +103,30 @@ app.layout = dbc.Container([
 ], fluid=True)
 
 # Dropdown menu and bar chart
-#Builds interaction between the displayed text below the dropdown menu and the graph
+#Builds interaction between the table, filters, bar charts and world map
 @app.callback(
     Output(component_id='feature-dropdown-container', component_property='children'),
     Output(component_id='feature-distribution', component_property='figure'),
     Output(component_id='table', component_property='data'),
+    Output(component_id='percentages_map', component_property='figure'),
+    Output(component_id="country_barplot", component_property="figure"),
     Input(component_id='table-feature-selection', component_property='value'),
     Input(component_id='feature-dropdown', component_property='value'),
-    Input(component_id='filter-dropdown', component_property='value')
+    Input(component_id='filter-dropdown', component_property='value'),
+    Input(component_id='columns_dropdown', component_property='value'),
+    Input(component_id="percentages_map", component_property="hoverData"),
+    Input(component_id='columns_dropdown', component_property='value')
 )
-def update_values(table_features, selected_features, filters):
+def update_values(table_features, selected_features, filters, dropdown_value, hoverDataMap, dropdown_value_hist):
 
     #Generate the text message that shows which features were selected
     if type(selected_features) == str:
         selected_features = [selected_features]
     printed_text = 'You have selected the following feature(s): {}'.format(', '.join(selected_features))
 
-    #Create a filtered dataset based on the 2nd dropdown and make the figure, model etc. with that filtered dataset
+    #Create filtered dataset based on the 2nd dropdown and make the figure, model etc. with that filtered dataset
     df_filtered = df.copy()
+
     if type(filters) == list:
         for i in filters:
             filter_column = i.split(' ')[0] #Select the column name
@@ -180,9 +186,93 @@ def update_values(table_features, selected_features, filters):
     )
     fig.update_yaxes(range=[0, 1])
 
+    #Now we make the worldmap plot
+    data = group_by_country(df_filtered, dropdown_value)()
+
+    # Load world map from Geopandas datasets
+    world = gpd.read_file(gpd.datasets.get_path('naturalearth_lowres'))
+
+    # Merge the dataframe with the world GeoDataFrame
+    world = world.merge(data, how='left', left_on='name', right_on=COUNTRY_COL)
+    
+    min_dropdown_value = find_closest(world[dropdown_value].min(), True)
+    max_dropdown_value = find_closest(world[dropdown_value].max(), False)
+
+    fig2 = px.choropleth(
+        world, locations='iso_a3', color=dropdown_value,
+        hover_name=COUNTRY_COL, hover_data=[COUNTRY_COL, dropdown_value, 'continent', 'pop_est'],
+        color_continuous_scale=px.colors.sequential.Viridis_r,
+        range_color=(min_dropdown_value, max_dropdown_value)
+    )
+
+    fig2.update_layout(
+        title=dict(text=f"{dropdown_value.title()} (%) per Country",
+                   font=dict(size=30), automargin=True, yref='container',
+                   y=0.95),
+        plot_bgcolor='rgba(0, 0, 0, 0)',
+        paper_bgcolor='rgba(0, 0, 0, 0)',
+        font=dict(color='white'),
+        coloraxis_colorbar=dict(
+            title=dict(font=dict(size=25)),
+            tickfont=dict(size=20)
+        )
+    )
+
+    #Now we update the histogram associated with the worldmap plot
+    country = "United States of America"
+    if hoverDataMap:
+        country = hoverDataMap['points'][0]['customdata'][0]
+    data = df_filtered.loc[df_filtered[COUNTRY_COL].isin([country]), :]
+
+    fig3 = px.histogram(
+        data_frame=data, 
+        x=dropdown_value_hist, 
+        color=dropdown_value_hist,
+        hover_name=COUNTRY_COL, 
+        hover_data=[COUNTRY_COL, dropdown_value_hist],
+        color_discrete_map={True: 'blue', False: 'red'}
+    )
+    fig3.update_layout(
+        title=dict(
+            text=f"{dropdown_value_hist} in {country}",
+            font=dict(size=24), 
+            automargin=True, 
+            yref='container',
+            y=0.95
+        ), 
+        xaxis_title=dict(
+            text=f"{dropdown_value_hist}",
+            font=dict(size=16)
+        ),
+        yaxis_title=dict(
+            text='Count',
+            font=dict(size=16)
+        ),
+        legend_title=dict(
+            text=f"{dropdown_value_hist}",
+            font=dict(size=16)
+        ),
+        plot_bgcolor='rgba(0, 0, 0, 0)',
+        paper_bgcolor='rgba(0, 0, 0, 0)',
+        font=dict(color='white'),
+        xaxis=dict(
+            showgrid=False,
+            zeroline=False,
+            showline=True,
+            linecolor='white'
+        ),
+        yaxis=dict(
+            showgrid=True,
+            gridcolor='white',
+            zeroline=False,
+            showline=True,
+            linecolor='white'
+        )
+    )
+
     table = df_filtered[table_features].to_dict('records')
 
-    return printed_text, fig, table
+    return printed_text, fig, table, fig2, fig3
 
 
 # Helper functions for Map visualization
@@ -212,104 +302,6 @@ def find_closest(num, find_min=True, num_list=np.linspace(0, 1, 51)):
             ub = num_
             if ub >= num:
                 return ub
-
-# Define callback function for updating map display
-@app.callback(
-    Output(component_id='percentages_map', component_property='figure'),
-    Input(component_id='columns_dropdown', component_property='value')
-)
-def update_percentages_map(dropdown_value):
-    data = group_by_country(df, dropdown_value)()
-
-    # Load world map from Geopandas datasets
-    world = gpd.read_file(gpd.datasets.get_path('naturalearth_lowres'))
-
-    # Merge the dataframe with the world GeoDataFrame
-    world = world.merge(data, how='left', left_on='name', right_on=COUNTRY_COL)
-    
-    min_dropdown_value = find_closest(world[dropdown_value].min(), True)
-    max_dropdown_value = find_closest(world[dropdown_value].max(), False)
-
-    fig = px.choropleth(
-        world, locations='iso_a3', color=dropdown_value,
-        hover_name=COUNTRY_COL, hover_data=[COUNTRY_COL, dropdown_value, 'continent', 'pop_est'],
-        color_continuous_scale=px.colors.sequential.Viridis_r,
-        range_color=(min_dropdown_value, max_dropdown_value)
-    )
-
-    fig.update_layout(
-        title=dict(text=f"{dropdown_value.title()} (%) per Country",
-                   font=dict(size=30), automargin=True, yref='container',
-                   y=0.95),
-        plot_bgcolor='rgba(0, 0, 0, 0)',
-        paper_bgcolor='rgba(0, 0, 0, 0)',
-        font=dict(color='white'),
-        coloraxis_colorbar=dict(
-            title=dict(font=dict(size=25)),
-            tickfont=dict(size=20)
-        )
-    )
-
-    return fig
-
-# Callback for updating histogram
-@app.callback(
-    Output(component_id="country_barplot", component_property="figure"),
-    Input(component_id="percentages_map", component_property="hoverData"),
-    Input(component_id='columns_dropdown', component_property='value')
-)
-def update_barplot(hoverDataMap, dropdown_value):
-    country = "United States of America"
-    if hoverDataMap:
-        country = hoverDataMap['points'][0]['customdata'][0]
-    data = df.loc[df[COUNTRY_COL].isin([country]), :]
-
-    fig = px.histogram(
-        data_frame=data, 
-        x=dropdown_value, 
-        color=dropdown_value,
-        hover_name=COUNTRY_COL, 
-        hover_data=[COUNTRY_COL, dropdown_value],
-        color_discrete_map={True: 'blue', False: 'red'}
-    )
-    fig.update_layout(
-        title=dict(
-            text=f"{dropdown_value} in {country}",
-            font=dict(size=24), 
-            automargin=True, 
-            yref='container',
-            y=0.95
-        ), 
-        xaxis_title=dict(
-            text=f"{dropdown_value}",
-            font=dict(size=16)
-        ),
-        yaxis_title=dict(
-            text='Count',
-            font=dict(size=16)
-        ),
-        legend_title=dict(
-            text=f"{dropdown_value}",
-            font=dict(size=16)
-        ),
-        plot_bgcolor='rgba(0, 0, 0, 0)',
-        paper_bgcolor='rgba(0, 0, 0, 0)',
-        font=dict(color='white'),
-        xaxis=dict(
-            showgrid=False,
-            zeroline=False,
-            showline=True,
-            linecolor='white'
-        ),
-        yaxis=dict(
-            showgrid=True,
-            gridcolor='white',
-            zeroline=False,
-            showline=True,
-            linecolor='white'
-        )
-    )
-    return fig
 
 # Run app
 if __name__ == '__main__':
