@@ -118,7 +118,8 @@ app.layout = dbc.Container([
     dbc.Row([
         dbc.Col([
             html.Br(),
-            dbc.Button("Train Model", id='train_button', color="primary", className="mr-2"),
+            dbc.Button("Train Selected Features", id='train_button', color="primary", className="mr-2"),
+            dbc.Button("Train Full Dataset", id='train_full_button', color="primary", className="mr-2"),
             dcc.Graph(id='feature_importances', style={'height': '70vh'})
         ], width=12)
     ])
@@ -140,9 +141,10 @@ app.layout = dbc.Container([
     Input(component_id='columns_dropdown', component_property='value'),
     Input(component_id="percentages_map", component_property="hoverData"),
     Input(component_id='columns_dropdown', component_property='value'),
-    Input(component_id='train_button', component_property='n_clicks')
+    Input(component_id='train_button', component_property='n_clicks'),
+    Input(component_id='train_full_button', component_property='n_clicks')
 )
-def update_values(table_features, selected_features, filters, dropdown_value, hoverDataMap, dropdown_value_hist, n_clicks):
+def update_values(table_features, selected_features, filters, dropdown_value, hoverDataMap, dropdown_value_hist, selected_n_clicks, full_n_clicks):
 
     #Generate the text message that shows which features were selected
     if type(selected_features) == str:
@@ -161,8 +163,6 @@ def update_values(table_features, selected_features, filters, dropdown_value, ho
                 filter_value = False
             df_filtered = df_filtered[df_filtered[filter_column] == filter_value]
 
-    # df for training
-    df_train = df_filtered[selected_features]
 
     #If no features were selected, return an empty figure
     if len(selected_features) == 0:
@@ -170,8 +170,7 @@ def update_values(table_features, selected_features, filters, dropdown_value, ho
         # fig2 = go.Figure()
         # fig3 = go.Figure() 
         table = []
-        # df_train = df_filtered.drop(['Country', 'Timestamp', 'Mental_Health_History'], axis=1)
-        return printed_text, fig, table #, fig2, fig3, df_train
+        return printed_text, fig, table #, fig2, fig3
 
     #Construct the updated barchart
     count_data = df_filtered[selected_features].apply(lambda x: x.value_counts(normalize=True)).T
@@ -305,22 +304,31 @@ def update_values(table_features, selected_features, filters, dropdown_value, ho
     table = df_filtered[table_features].to_dict('records')
 
     #### 
-    if n_clicks is None:
+    if selected_n_clicks is None and full_n_clicks is None:
         # return ""
         ###new
         feature_importances_fig = go.Figure()
         return printed_text, fig, table, fig2, fig3, feature_importances_fig
     
+    # df for training
+    # df_train = df_filtered[selected_features]
+    if selected_n_clicks:
+        df_train = df_filtered[selected_features]
+    elif full_n_clicks:
+        df_train = df_filtered.drop(['Country', 'Timestamp', 'Mental_Health_History'], axis=1)
+
     target = 'treatment'  
     X, clf = train(df_filtered, df_train, target, selected_features)
 
     #feature importance
     importances = clf.coef_[0]
     feature_importances = pd.Series(importances, index=X.columns)
+    feature_importances = feature_importances.sort_values(ascending=True)
+    feature_importances = feature_importances[feature_importances >= 0]
 
     feature_importances_fig = px.bar(feature_importances, x=feature_importances.values, y=feature_importances.index,
                                      labels={'x': 'Importance', 'y': 'Feature'},
-                                     title='Logistic Regression Feature Importances')
+                                     title='Feature Importances')
 
     feature_importances_fig.update_layout(
         plot_bgcolor='rgba(0, 0, 0, 0)',
