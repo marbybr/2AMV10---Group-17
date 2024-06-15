@@ -70,39 +70,53 @@ app.layout = dbc.Container([
         dbc.Col([
             #html.Br(),
             dcc.Graph(id='percentages_map', clear_on_unhover=True, style={'height': '42vh'})
-            ], width=5),  # Map  
+            ], width=4),  # Map  
 
         dbc.Col([
             dcc.Graph(id='country_barplot', clear_on_unhover=True, style={'height': '42vh'})
             ], width=3),  # Histogram
-        dbc.Col([
-            None
-        ], width=1),
         #Show a simple histogram for the selected feature
         dbc.Col([
             dcc.Graph(figure={}, id='feature-distribution')
-            ], width=3)
+            ], width=5)
     ]),
 
     #####
     # Add a button to train the model and display feature importances
     dbc.Row([
-        html.Div('Train model and Feature Importance', style={
-            'fontSize': '24px', 
+        dbc.Col([
+            # html.Div('Train model and Feature Importance', style={
+            # 'fontSize': '20px', 
+            # 'fontWeight': 'normal', 
+            # 'textAlign': 'center', 
+            # 'marginTop': '20px', 
+            # 'marginBottom': '20px'
+            # }),
+            dbc.Button("Train Selected Features", id='train_button', color="primary", className="mr-2"),
+            dbc.Button("Train Full Dataset", id='train_full_button', color="primary", className="mr-2"),
+            dcc.Graph(id='feature_importances', style={'height': '60vh'})
+        ], width=6),
+
+        dbc.Col([
+            # html.Div('Counterfactual Explanations', style={
+            # 'fontSize': '20px', 
+            # 'fontWeight': 'normal', 
+            # 'textAlign': 'center', 
+            # 'marginTop': '20px', 
+            # 'marginBottom': '20px'
+            # }),
+
+            #Replace the line below with the counterfactuals plot
+                        #Replace the code below with the counterfactuals plot
+            html.Div('placeholder for counterfactuals plot', style={
+            'fontSize': '60px', 
             'fontWeight': 'normal', 
             'textAlign': 'center', 
             'marginTop': '20px', 
             'marginBottom': '20px'
-        })
+            })
+        ], width=6)
     ]),
-    dbc.Row([
-        dbc.Col([
-            html.Br(),
-            dbc.Button("Train Selected Features", id='train_button', color="primary", className="mr-2"),
-            dbc.Button("Train Full Dataset", id='train_full_button', color="primary", className="mr-2"),
-            dcc.Graph(id='feature_importances', style={'height': '60vh'})
-        ], width=12)
-    ])
 ], fluid=True)
 
 # Dropdown menu and bar chart
@@ -286,7 +300,7 @@ def update_values(selected_features, filters, dropdown_value, hoverDataMap, drop
     if selected_n_clicks is None and full_n_clicks is None:
         # return ""
         ###new
-        feature_importances_fig = go.Figure()
+        feature_importances_fig = px.bar(height = 250)
         return fig, fig2, fig3, feature_importances_fig
     
     # df for training
@@ -303,11 +317,12 @@ def update_values(selected_features, filters, dropdown_value, hoverDataMap, drop
     importances = clf.coef_[0]
     feature_importances = pd.Series(importances, index=X.columns)
     feature_importances = feature_importances.sort_values(ascending=True)
-    feature_importances = feature_importances[feature_importances >= 0]
+    #feature_importances = feature_importances[feature_importances >= 0]
 
     feature_importances_fig = px.bar(feature_importances, x=feature_importances.values, y=feature_importances.index,
                                      labels={'x': 'Importance', 'y': 'Feature'},
-                                     title='Feature Importances')
+                                     title='Feature Importances',
+                                     height = 250)
 
     feature_importances_fig.update_layout(
         plot_bgcolor='rgba(0, 0, 0, 0)',
