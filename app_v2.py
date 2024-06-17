@@ -16,6 +16,9 @@ from ceml.sklearn import generate_counterfactual
 #Load the dataset
 df = pd.read_csv('data_cleaned.csv')
 
+df['Mental_Health_History_Yes'] = df['Mental_Health_History'] == 'Yes'
+df.drop(columns=['Mental_Health_History'], inplace=True)
+    
 # Set default name for `Country` column
 COUNTRY_COL = "Country"
 
@@ -155,9 +158,10 @@ def update_values(selected_features, filters, dropdown_value, hoverDataMap, drop
     #If no features were selected, return an empty figure
     if len(selected_features) == 0:
         fig = go.Figure()
-        # fig2 = go.Figure()
-        # fig3 = go.Figure() 
-        return fig #, fig2, fig3
+        fig2 = go.Figure()
+        fig3 = go.Figure() 
+        feature_importances_fig = go.Figure()
+        return fig, fig2, fig3, feature_importances_fig
 
     #Construct the updated barchart
     count_data = df_filtered[selected_features].apply(lambda x: x.value_counts(normalize=True)).T
