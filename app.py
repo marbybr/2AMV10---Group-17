@@ -118,9 +118,7 @@ app.layout = dbc.Container([
 
             #Replace the line below with the counterfactuals plot
                         #Replace the code below with the counterfactuals plot
-            dcc.Dropdown(id="counterfactuals_dd", 
-                         options=[{'label': column, 'value': column} for column in mutable_features],
-                         value=[mutable_features[0]],
+            dcc.Dropdown(id="counterfactuals_dd",
                          multi=True),
             # html.Div('placeholder for counterfactuals plot', style={
             # 'fontSize': '60px', 
@@ -133,6 +131,18 @@ app.layout = dbc.Container([
         ], width=6)
     ]),
 ], fluid=True)
+
+# Callback for updating counterfactuals dropdown menu
+@app.callback(
+        Output(component_id="counterfactuals_dd", component_property="options"),
+        Input(component_id='feature-dropdown', component_property='value')
+)
+
+def update_counterfactual_dropdown(value):
+    # Set value to list if not already
+    if isinstance(value, str):
+        value = [value]
+    return [{'label': v, 'value': v} for v in value if v in mutable_features]
 
 # Dropdown menu and bar chart
 #Builds interaction between the table, filters, bar charts and world map
@@ -158,10 +168,6 @@ def update_values(selected_features, filters, dropdown_value, hoverDataMap, drop
     #Generate the text message that shows which features were selected
     if type(selected_features) == str:
         selected_features = [selected_features]
-    
-    # Also for cf dropdown
-    if type(cf_features) == str:
-        cf_features = [cf_features]
 
     #Create filtered dataset based on the 2nd dropdown and make the figure, model etc. with that filtered dataset
     df_filtered = df.copy()
@@ -357,11 +363,17 @@ def update_values(selected_features, filters, dropdown_value, hoverDataMap, drop
     )
 
     # Lastly, the counterfactuals
+    if isinstance(cf_features, str):
+        cf_features = [cf_features]
+    elif cf_features is None:
+        fig_cf = go.Figure()
+    
     try:
-        features_to_vary = [feature for feature in cf_features if feature in selected_features]
+        features_to_vary = [feature for feature in cf_features if feature in mutable_features]
         print(features_to_vary)
         cf, differences = get_counterfactuals_from_model(X=X_test, y=y_test, model=clf, features_to_vary=features_to_vary, 
-                                                        outcome_name=target, idx=list(range(3)), total_CFs=1)
+                                                        outcome_name=target, idx=list(range(3)), total_CFs=15)
+        print(differences)
         
         # For now get first row
         sample_row = differences[0][0]
