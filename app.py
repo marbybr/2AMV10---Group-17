@@ -177,7 +177,7 @@ def update_values(selected_features, filters, dropdown_value, hoverDataMap, drop
 
 
     #If no features were selected, return an empty figure
-    if len(selected_features) == 0 or len(cf_features) == 0:
+    if len(selected_features) == 0:
         fig = go.Figure()
         fig2 = go.Figure()
         fig3 = go.Figure()
@@ -358,7 +358,8 @@ def update_values(selected_features, filters, dropdown_value, hoverDataMap, drop
 
     # Lastly, the counterfactuals
     try:
-        features_to_vary = list(set(mutable_features).intersection(cf_features))
+        features_to_vary = [feature for feature in cf_features if feature in selected_features]
+        print(features_to_vary)
         cf, differences = get_counterfactuals_from_model(X=X_test, y=y_test, model=clf, features_to_vary=features_to_vary, 
                                                         outcome_name=target, idx=list(range(3)), total_CFs=1)
         
