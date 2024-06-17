@@ -305,7 +305,7 @@ def update_values(selected_features, filters, dropdown_value, hoverDataMap, drop
     
     # train model 
     df_train = df_filtered[selected_features]
-    target = 'treatment'  
+    target = dropdown_value #'treatment'  
     X, clf = train(df_filtered, df_train, target, selected_features)
 
     #feature importance
