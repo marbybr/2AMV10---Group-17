@@ -325,17 +325,19 @@ def update_values(selected_features, filters, dropdown_value, hoverDataMap, drop
         # return ""
         ###new
         feature_importances_fig = px.bar(height = 250)
-        return fig, fig2, fig3, feature_importances_fig
+        fig_cf = go.Figure()
+        return fig, fig2, fig3, feature_importances_fig, fig_cf
     
     # df for training
     # df_train = df_filtered[selected_features]
     if selected_n_clicks:
         df_train = df_filtered[selected_features]
     elif full_n_clicks:
-        df_train = df_filtered.drop(['Country', 'Timestamp', 'Mental_Health_History'], axis=1)
+        df_train = df_filtered.drop(['Country', 'Timestamp'], axis=1)
 
     target = 'treatment'  
-    X, clf, X_test, y_test = train(df_filtered, df_train, target, selected_features)
+    X, clf, X_test, y_test = train(df_filtered.drop(['Country', 'Timestamp'], axis=1).astype(int), 
+                                   df_train.astype(int), target, selected_features)
 
     #feature importance
     importances = clf.coef_[0]
@@ -355,30 +357,32 @@ def update_values(selected_features, filters, dropdown_value, hoverDataMap, drop
     )
 
     # Lastly, the counterfactuals
-    features_to_vary = [feature for feature in mutable_features if feature in selected_features if feature in cf_features]
-    cf, differences = get_counterfactuals_from_model(X=X_test, y=y_test, model=clf, features_to_vary=features_to_vary, 
-                                                     outcome_name=target, idx=list(range(3)), total_CFs=1)
-    
-    # For now get first row
-    sample_row = differences[0][0]
+    try:
+        features_to_vary = list(set(mutable_features).intersection(cf_features))
+        cf, differences = get_counterfactuals_from_model(X=X_test, y=y_test, model=clf, features_to_vary=features_to_vary, 
+                                                        outcome_name=target, idx=list(range(3)), total_CFs=1)
+        
+        # For now get first row
+        sample_row = differences[0][0]
 
-    # Make plot of data
-    plot_data = pd.DataFrame({
-    'Feature': sample_row.columns,
-    'Value': sample_row.values.flatten()
-    })
-    plot_data['Color'] = plot_data['Value'].map({-1: 'red', 1: 'blue'})
+        # Make plot of data
+        plot_data = pd.DataFrame({
+        'Feature': sample_row.columns,
+        'Value': sample_row.values.flatten()
+        })
+        plot_data['Color'] = plot_data['Value'].map({-1: 'red', 1: 'blue'})
 
-    # Create the horizontal bar plot
-    fig_cf = px.bar(plot_data, x='Value', y='Feature', orientation='h', color='Color',
-                title='Feature Values', labels={'Value': 'Value', 'Feature': 'Feature'},
-                color_discrete_map={'red': 'red', 'blue': 'blue'})
-
-    # Update legend title and labels
-    fig_cf.update_layout(
-        legend_title_text='What to change'
-    )
-    fig_cf.for_each_trace(lambda t: t.update(name={'red': '1 --> 0', 'blue': '0 --> 1'}[t.name]))
+        # Create the horizontal bar plot
+        fig_cf = px.bar(plot_data, x='Value', y='Feature', orientation='h', color='Color',
+                    title='Feature Values', labels={'Value': 'Value', 'Feature': 'Feature'},
+                    color_discrete_map={'red': 'red', 'blue': 'blue'})
+        # Update legend title and labels
+        fig_cf.update_layout(
+            legend_title_text='What to change'
+        )
+        fig_cf.for_each_trace(lambda t: t.update(name={'red': '1 --> 0', 'blue': '0 --> 1'}[t.name]))
+    except:
+        fig_cf = go.Figure()
 
     return fig, fig2, fig3, feature_importances_fig, fig_cf
 
