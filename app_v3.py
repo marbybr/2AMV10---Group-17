@@ -506,8 +506,12 @@ def get_counterfactuals_from_model(X: pd.DataFrame, y: pd.Series, model, feature
         A CounterfactualExplanations object that contains the list of
             counterfactual examples per query_instance as one of its attributes.
     """
+    # Get only data where target = 1
+    data = pd.concat([X, y], axis=1)
+    data = data.loc[:, data[outcome_name] == 1]
+
     # Prepare data for DiCE
-    data_interface = dice_ml.Data(dataframe=pd.concat([X, y], axis=1), 
+    data_interface = dice_ml.Data(data, 
                          continuous_features=continous_features, outcome_name=outcome_name)
     
     # Prepare model for DiCE
@@ -527,7 +531,10 @@ def get_counterfactuals_from_model(X: pd.DataFrame, y: pd.Series, model, feature
         query_instances=query_instances,
         total_CFs=total_CFs,
         desired_class=desired_class,
-        features_to_vary=features_to_vary
+        features_to_vary=features_to_vary,
+        diversity_weight=0.1,
+        proximity_weight=0.1,
+        stopping_threshold=0.3
     )
 
     # Get differences between query instances and counterfactuals

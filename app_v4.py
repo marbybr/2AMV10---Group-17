@@ -18,6 +18,9 @@ from dice_ml.utils import helpers
 df = pd.read_csv('data_cleaned.csv')
 df["Mental_Health_History"] = df['Mental_Health_History'].map({'No': 0, 'Maybe': 0, 'Yes': 1})
 
+# Load dataset with combinations
+df_combinations = pd.read_csv('df_combinations_imm_features.csv').sample(frac=1, random_state=42).reset_index(drop=True)
+
 # Set default name for `Country` column
 COUNTRY_COL = "Country"
 
@@ -62,7 +65,7 @@ app.layout = dbc.Container([
     #set the 2nd column (so first after index and Timestamp) as the standard selected option
     dbc.Row([
         dbc.Col([
-            dcc.Dropdown(df.columns[1:].drop(['Country']), mutable_features[0], id='feature-dropdown', multi=True)
+            dcc.Dropdown(df.columns[1:].drop(['Country']+immutable_features), mutable_features[0], id='feature-dropdown', multi=True)
         ],width=4),
         dbc.Col([
             dcc.Dropdown(id='columns_dropdown',
@@ -120,8 +123,7 @@ app.layout = dbc.Container([
                         #Replace the code below with the counterfactuals plot
             # dcc.Dropdown(id="counterfactuals_dd",
             #              multi=True),
-            dcc.Dropdown([f"{col}{sign}" for col in df.columns[1:] for sign in [' = True', ' = False']], 
-                         id='counterfactuals_dd', multi=True),
+            dcc.Dropdown(id='counterfactuals_dd', multi=True),
             # html.Div('placeholder for counterfactuals plot', style={
             # 'fontSize': '60px', 
             # 'fontWeight': 'normal', 
@@ -134,17 +136,17 @@ app.layout = dbc.Container([
     ]),
 ], fluid=True)
 
-# # Callback for updating counterfactuals dropdown menu
-# @app.callback(
-#         Output(component_id="counterfactuals_dd", component_property="options"),
-#         Input(component_id='feature-dropdown', component_property='value')
-# )
+# Callback for updating counterfactuals dropdown menu
+@app.callback(
+        Output(component_id="counterfactuals_dd", component_property="options"),
+        Input(component_id='feature-dropdown', component_property='value')
+)
 
-# def update_counterfactual_dropdown(value):
-#     # Set value to list if not already
-#     if isinstance(value, str):
-#         value = [value]
-#     return [{'label': v, 'value': v} for v in value if v in mutable_features]
+def update_counterfactual_dropdown(value):
+    # Set value to list if not already
+    if isinstance(value, str):
+        value = [value]
+    return [f"{col}{sign}" for col in value for sign in [' = True', ' = False']]
 
 # Dropdown menu and bar chart
 #Builds interaction between the table, filters, bar charts and world map
@@ -170,6 +172,7 @@ def update_values(selected_features, filters, dropdown_value, hoverDataMap, drop
     #Generate the text message that shows which features were selected
     if type(selected_features) == str:
         selected_features = [selected_features]
+    selected_features = selected_features + immutable_features
 
     #Create filtered dataset based on the 2nd dropdown and make the figure, model etc. with that filtered dataset
     df_filtered = df.copy()
@@ -194,7 +197,8 @@ def update_values(selected_features, filters, dropdown_value, hoverDataMap, drop
         return fig, fig2, fig3, feature_importances_fig, fig_cf
 
     #Construct the updated barchart
-    count_data = df_filtered[selected_features].apply(lambda x: x.value_counts(normalize=True)).T
+    count_data = df_filtered[[feature for feature in selected_features if feature not in immutable_features]]\
+        .apply(lambda x: x.value_counts(normalize=True)).T
     if not True in count_data.columns:
         count_data[True] = 0
     if not False in count_data.columns:
@@ -394,44 +398,52 @@ def update_values(selected_features, filters, dropdown_value, hoverDataMap, drop
     for cf_filter in cf_filters:
         column, value = cf_filter.split(' = ')
         if value == 'True':
-            query_instance[column] = [1]
+            query_instance[column] = [1] * 25
         else:
-            query_instance[column] = [0]
+            query_instance[column] = [0] * 25
     
     # Add dummy values for query instance
     for column in df_train.columns.values:
         if column not in list(query_instance.keys()):
-            query_instance[column] = [0]
-    query_instance = pd.DataFrame(query_instance)
-    
-    try:
-        features_to_vary = [feature for feature in query_instance.columns if feature in mutable_features]
-        _, differences = get_counterfactuals_from_model(X=query_instance, model=clf, features_to_vary=features_to_vary, 
-                                                        outcome_name=target, total_CFs=1)
+            query_instance[column] = [0] * 25
         
-        # For now get first row
-        sample_row = differences[0][0]
+    query_instance = pd.DataFrame(query_instance).reset_index(drop=True)
+    df_combis = df_combinations.iloc[0:len(query_instance)].reset_index(drop=True)
+    query_instance = pd.concat([query_instance, df_combis], axis=1)
+    print(query_instance.shape)
+    query_instance = query_instance.loc[:, ~query_instance.columns.str.contains('^Unnamed')]
+    
+    # try:
+    features_to_vary = [feature for feature in query_instance.columns if feature in mutable_features]
+    _, differences = get_counterfactuals_from_model(X=query_instance, model=clf, features_to_vary=features_to_vary, 
+                                                    outcome_name=target, total_CFs=1)
+    print(differences)
+        
+        # # For now get first row
+        # sample_row = differences[0][0]ss
 
-        # Make plot of data
-        plot_data = pd.DataFrame({
-        'Feature': sample_row.columns,
-        'Value': sample_row.values.flatten()
-        })
-        plot_data['Color'] = plot_data['Value'].map({-1: 'red', 1: 'blue'})
+        # # Make plot of data
+        # plot_data = pd.DataFrame({
+        # 'Feature': sample_row.columns,
+        # 'Value': sample_row.values.flatten()
+        # })
+        # plot_data['Color'] = plot_data['Value'].map({-1: 'red', 1: 'blue'})
 
-        # Create the horizontal bar plot
-        fig_cf = px.bar(plot_data, x='Value', y='Feature', orientation='h', color='Color',
-                    title='Feature Values', labels={'Value': 'Value', 'Feature': 'Feature'},
-                    color_discrete_map={'red': 'red', 'blue': 'blue'})
-        # Update legend title and labels
-        fig_cf.update_layout(
-            legend_title_text='What to change'
-        )
-        fig_cf.for_each_trace(lambda t: t.update(name={'red': '1 --> 0', 'blue': '0 --> 1'}[t.name]))
-    except:
-        fig_cf = go.Figure()
+        # # Create the horizontal bar plot
+        # fig_cf = px.bar(plot_data, x='Value', y='Feature', orientation='h', color='Color',
+        #             title='Feature Values', labels={'Value': 'Value', 'Feature': 'Feature'},
+        #             color_discrete_map={'red': 'red', 'blue': 'blue'})
+        # # Update legend title and labels
+        # fig_cf.update_layout(
+        #     legend_title_text='What to change'
+        # )
+        # fig_cf.for_each_trace(lambda t: t.update(name={'red': '1 --> 0', 'blue': '0 --> 1'}[t.name]))
+    #     fig_cf = go.Figure()
+    # except:
+    #     print("Error")
+    #     fig_cf = go.Figure()
 
-    return fig, fig2, fig3, feature_importances_fig, fig_cf
+    return fig, fig2, fig3, feature_importances_fig, go.Figure()
 
 
 # Helper functions for Map visualization
@@ -517,10 +529,10 @@ def get_counterfactuals_from_model(X: pd.DataFrame, model, features_to_vary, out
             counterfactual examples per query_instance as one of its attributes.
     """
     # Set target (treatment) to be True
-    y = pd.DataFrame({'treatment': [1]})
+    X['treatment'] = [1] * len(X)
 
     # Prepare data for DiCE
-    data_interface = dice_ml.Data(dataframe=pd.concat([X, y], axis=1), 
+    data_interface = dice_ml.Data(dataframe=X, 
                          continuous_features=continous_features, outcome_name=outcome_name)
     
     # Prepare model for DiCE
@@ -539,8 +551,8 @@ def get_counterfactuals_from_model(X: pd.DataFrame, model, features_to_vary, out
         desired_class=desired_class,
         features_to_vary=features_to_vary,
         stopping_threshold=0.2,
-        proximity_weight=1.0,
-        sparsity_weight=1.0
+        proximity_weight=0.01,
+        diversity_weight=0.01
     )
 
     # Get differences between query instances and counterfactuals
