@@ -287,9 +287,11 @@ def update_values(selected_features, filters, dropdown_value, hoverDataMap, drop
         paper_bgcolor='rgba(0, 0, 0, 0)',
         font=dict(color='white'),
         coloraxis_colorbar=dict(
-            title=dict(font=dict(size=25)),
-            tickfont=dict(size=20),
-            tickformat=".0%"
+            title=" ",
+            tickfont=dict(size=10),
+            tickformat=".0%",
+            lenmode='fraction',
+            len=0.9
         )
     )
 
@@ -427,7 +429,6 @@ def update_values(selected_features, filters, dropdown_value, hoverDataMap, drop
         )
         fig_cf.for_each_trace(lambda t: t.update(name={'red': '1 --> 0', 'blue': '0 --> 1'}[t.name]))
     except:
-        print("ERROR!")
         fig_cf = go.Figure()
 
     return fig, fig2, fig3, feature_importances_fig, fig_cf
