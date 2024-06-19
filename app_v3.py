@@ -116,6 +116,12 @@ app.layout = dbc.Container([
         Input(component_id='feature-dropdown', component_property='value')
 )
 
+def update_counterfactual_dropdown(value):
+    # Set value to list if not already
+    if isinstance(value, str):
+        value = [value]
+    return [{'label': v, 'value': v} for v in value if v in mutable_features]
+
 #Builds interaction between the table, filters, bar charts and world map
 @app.callback(
     Output(component_id='feature-distribution', component_property='figure'),
