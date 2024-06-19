@@ -285,9 +285,11 @@ def update_values(selected_features, filters, dropdown_value, hoverDataMap, drop
         paper_bgcolor='rgba(0, 0, 0, 0)',
         font=dict(color='white'),
         coloraxis_colorbar=dict(
-            title=dict(font=dict(size=25)),
-            tickfont=dict(size=20),
-            tickformat=".0%"
+            title=" ",
+            tickfont=dict(size=10),
+            tickformat=".0%",
+            lenmode='fraction',
+            len=0.9
         )
     )
 
@@ -382,37 +384,69 @@ def update_values(selected_features, filters, dropdown_value, hoverDataMap, drop
     # Lastly, the counterfactuals
     if isinstance(cf_features, str):
         cf_features = [cf_features]
-    elif cf_features is None:
-        fig_cf = go.Figure()
     
-    try:
+    if not(cf_features is None):
         features_to_vary = [feature for feature in cf_features if feature in mutable_features]
         print(features_to_vary)
-        cf, differences = get_counterfactuals_from_model(X=X_test, y=y_test, model=clf, features_to_vary=features_to_vary, 
-                                                        outcome_name=target, idx=list(range(3)), total_CFs=15)
-        print(differences)
-        
-        # For now get first row
-        sample_row = differences[0][0]
+    else:
+        fig_cf = go.Figure()
+                # Update layout for black background
+        fig_cf.update_layout(\
+            title="Counterfactuals",
+            plot_bgcolor='black',
+            paper_bgcolor='black',
+            xaxis=dict(showgrid=False, zeroline=False, showticklabels=False),
+            yaxis=dict(showgrid=False, zeroline=False, showticklabels=False)
+        )
+        return fig, fig2, fig3, feature_importances_fig, fig_cf
+    cf, differences = get_counterfactuals_from_model(X=X_test, y=y_test, model=clf, features_to_vary=features_to_vary, 
+                                                    outcome_name=target, idx=list(range(100)), total_CFs=1)
+    
+    # For now get first row
+    sample_row = compute_all_differences(differences)
 
-        # Make plot of data
-        plot_data = pd.DataFrame({
+    plot_data = pd.DataFrame({
         'Feature': sample_row.columns,
         'Value': sample_row.values.flatten()
-        })
-        plot_data['Color'] = plot_data['Value'].map({-1: 'red', 1: 'blue'})
+    })
+    plot_data['Color'] = ['red' if val < 0 else 'blue' for val in plot_data['Value']]
+    plot_data['Value'] = plot_data['Value'].abs()
+    plot_data = plot_data[plot_data['Value'] > 0]
+    plot_data = plot_data.sort_values(by=["Value"], ascending=True)
+    plot_data = plot_data.reset_index(drop=True)
 
-        # Create the horizontal bar plot
-        fig_cf = px.bar(plot_data, x='Value', y='Feature', orientation='h', color='Color',
-                    title='Feature Values', labels={'Value': 'Value', 'Feature': 'Feature'},
-                    color_discrete_map={'red': 'red', 'blue': 'blue'})
-        # Update legend title and labels
-        fig_cf.update_layout(
-            legend_title_text='What to change'
+
+
+    fig_cf = go.Figure()
+
+    for index, row in plot_data.iterrows():
+        fig_cf.add_trace(go.Bar(
+            x=[row['Value']],
+            y=[row['Feature']],
+            orientation='h',
+            marker_color=row['Color'],
+            name='1 --> 0' if row['Color'] == 'red' else '0 --> 1'
+        ))
+
+    # Update layout
+    fig_cf.update_layout(
+        title='Counterfactuals',
+        xaxis_title='Value',
+        yaxis_title='Feature',
+        barmode='stack',
+        showlegend=True
+    )
+
+    # Customize legend
+    fig_cf.update_layout(
+        legend=dict(
+            title='What to change',
+            itemsizing='constant',
+            traceorder='normal'
         )
-        fig_cf.for_each_trace(lambda t: t.update(name={'red': '1 --> 0', 'blue': '0 --> 1'}[t.name]))
-    except:
-        fig_cf = go.Figure()
+    )
+    # except:
+    #     fig_cf = go.Figure()
 
     return fig, fig2, fig3, feature_importances_fig, fig_cf
 
@@ -506,12 +540,13 @@ def get_counterfactuals_from_model(X: pd.DataFrame, y: pd.Series, model, feature
         A CounterfactualExplanations object that contains the list of
             counterfactual examples per query_instance as one of its attributes.
     """
-    # Get only data where target = 1
-    data = pd.concat([X, y], axis=1)
-    data = data.loc[:, data[outcome_name] == 1]
+    # Get values where treatment = 1
+    condition = (y == 1).values
+    X_ = X[condition].reset_index(drop=True)
+    y_ = y[condition].reset_index(drop=True)
 
     # Prepare data for DiCE
-    data_interface = dice_ml.Data(data, 
+    data_interface = dice_ml.Data(dataframe=pd.concat([X_, y_], axis=1), 
                          continuous_features=continous_features, outcome_name=outcome_name)
     
     # Prepare model for DiCE
@@ -532,9 +567,9 @@ def get_counterfactuals_from_model(X: pd.DataFrame, y: pd.Series, model, feature
         total_CFs=total_CFs,
         desired_class=desired_class,
         features_to_vary=features_to_vary,
-        diversity_weight=0.1,
-        proximity_weight=0.1,
-        stopping_threshold=0.3
+        # diversity_weight=0.1,
+        # proximity_weight=0.1,
+        # stopping_threshold=0.3
     )
 
     # Get differences between query instances and counterfactuals
@@ -543,10 +578,13 @@ def get_counterfactuals_from_model(X: pd.DataFrame, y: pd.Series, model, feature
         # Store differences in array
         differences = []
         for cf_, query_instance in zip(cf.__dict__['_cf_examples_list'], query_instances.to_numpy()):
-            # Multiply by -1 because we want to know the change from the original entry
-            difference = (cf_.final_cfs_df.to_numpy()[:, :-1] - query_instance) * -1
-            difference = np.where(difference == -0., 0, difference)
-            differences.append(difference)
+            try:
+                # Multiply by -1 because we want to know the change from the original entry
+                difference = (cf_.final_cfs_df.to_numpy()[:, :-1] - query_instance) * -1
+                difference = np.where(difference == -0., 0, difference)
+                differences.append(difference)
+            except:
+                pass
         return differences
     
     # Get differences as dataframes
@@ -561,6 +599,12 @@ def get_counterfactuals_from_model(X: pd.DataFrame, y: pd.Series, model, feature
         differences_as_df.append(difference_as_df)
     
     return cf, differences_as_df
+
+def compute_all_differences(differences):
+    differences_ = differences[0][0]
+    for difference in differences[1:]:
+        differences_ += difference[0]
+    return differences_ / len(differences)
 
 # Run app
 if __name__ == '__main__':
