@@ -1,7 +1,6 @@
 import numpy as np
 from dash import Dash, html, dash_table, dcc, callback, Output, Input
 import pandas as pd
-from sklearn.manifold import TSNE
 import matplotlib.pyplot as plt
 import geopandas as gpd
 import plotly.express as px
@@ -16,12 +15,14 @@ from dice_ml.utils import helpers
 
 #Load the dataset
 df = pd.read_csv('data_cleaned.csv')
+ 
+# Turn this categorical variable into binary variable
 df["Mental_Health_History"] = df['Mental_Health_History'].map({'No': 0, 'Maybe': 0, 'Yes': 1})
-
+    
 # Set default name for `Country` column
 COUNTRY_COL = "Country"
 
-# Get mutable and immutable features
+# Get mutable and immutable features for counterfactual
 immutable_features = ['Australia_and_New_Zealand', 'Central_America', 'Eastern_Europe', 'Northern_America', 'Northern_Europe', 
                       'South_America', 'Southeastern_Asia', 'Southern_Africa', 'Southern_Asia', 'Southern_Europe', 'Western_Africa', 
                       'Western_Asia', 'Western_Europe', 'Female', 'family_history', 'Mental_Health_History']
@@ -85,48 +86,25 @@ app.layout = dbc.Container([
         dbc.Col([
             dcc.Graph(id='country_barplot', clear_on_unhover=True, style={'height': '50vh'})
             ], width=2),  # Histogram
-        #Show a simple histogram for the selected feature
+         
         dbc.Col([
             dcc.Graph(figure={}, id='feature-distribution')
-            ], width=3)
+            ], width=3)   #Histogram for the selected feature
     ]),
 
-    #####
-    # Add a button to train the model and display feature importances
+    # Training and counterfactuals explanations
     dbc.Row([
+        # Button to train the model and display feature importances
         dbc.Col([
-            # html.Div('Train model and Feature Importance', style={
-            # 'fontSize': '20px', 
-            # 'fontWeight': 'normal', 
-            # 'textAlign': 'center', 
-            # 'marginTop': '20px', 
-            # 'marginBottom': '20px'
-            # }),
             dbc.Button("Train Selected Features", id='train_button', color="primary", className="mr-2"),
-            dbc.Button("Train Full Dataset", id='train_full_button', color="primary", className="mr-2"),
             dcc.Graph(id='feature_importances', style={'height': '60vh'})
         ], width=6),
 
+        # Dropdown menu and counterfactual graph
         dbc.Col([
-            # html.Div('Counterfactual Explanations', style={
-            # 'fontSize': '20px', 
-            # 'fontWeight': 'normal', 
-            # 'textAlign': 'center', 
-            # 'marginTop': '20px', 
-            # 'marginBottom': '20px'
-            # }),
-
-            #Replace the line below with the counterfactuals plot
-                        #Replace the code below with the counterfactuals plot
             dcc.Dropdown(id="counterfactuals_dd",
                          multi=True),
-            # html.Div('placeholder for counterfactuals plot', style={
-            # 'fontSize': '60px', 
-            # 'fontWeight': 'normal', 
-            # 'textAlign': 'center', 
-            # 'marginTop': '20px', 
-            # 'marginBottom': '20px'
-            # })
+
             dcc.Graph(id="cf_barplot", style={'height': '60vh'})
         ], width=6)
     ]),
@@ -138,16 +116,8 @@ app.layout = dbc.Container([
         Input(component_id='feature-dropdown', component_property='value')
 )
 
-def update_counterfactual_dropdown(value):
-    # Set value to list if not already
-    if isinstance(value, str):
-        value = [value]
-    return [{'label': v, 'value': v} for v in value if v in mutable_features]
-
-# Dropdown menu and bar chart
 #Builds interaction between the table, filters, bar charts and world map
 @app.callback(
-    #####
     Output(component_id='feature-distribution', component_property='figure'),
     Output(component_id='percentages_map', component_property='figure'),
     Output(component_id="country_barplot", component_property="figure"),
@@ -159,10 +129,9 @@ def update_counterfactual_dropdown(value):
     Input(component_id="percentages_map", component_property="hoverData"),
     Input(component_id='columns_dropdown', component_property='value'),
     Input(component_id='train_button', component_property='n_clicks'),
-    Input(component_id='train_full_button', component_property='n_clicks'),
     Input(component_id='counterfactuals_dd', component_property='value')
 )
-def update_values(selected_features, filters, dropdown_value, hoverDataMap, dropdown_value_hist, selected_n_clicks, full_n_clicks,
+def update_values(selected_features, filters, dropdown_value, hoverDataMap, dropdown_value_hist, selected_n_clicks,
                   cf_features):
 
     #Generate the text message that shows which features were selected
@@ -345,30 +314,25 @@ def update_values(selected_features, filters, dropdown_value, hoverDataMap, drop
         )
     )
 
-    #### 
-    if selected_n_clicks is None and full_n_clicks is None:
+    # when train button is not clicked
+    if selected_n_clicks is None:
         # return ""
         ###new
         feature_importances_fig = px.bar(height = 250)
         fig_cf = go.Figure()
         return fig, fig2, fig3, feature_importances_fig, fig_cf
     
-    # df for training
-    # df_train = df_filtered[selected_features]
-    if selected_n_clicks:
-        df_train = df_filtered[selected_features]
-    elif full_n_clicks:
-        df_train = df_filtered.drop(['Country', 'Timestamp'], axis=1)
-
-    target = 'treatment'  
+    # training 
+    df_train = df_filtered[selected_features] 
+    target = dropdown_value
     X, clf, X_test, y_test = train(df_filtered.drop(['Country', 'Timestamp'], axis=1).astype(int), 
                                    df_train.astype(int), target, selected_features)
 
     #feature importance
     importances = clf.coef_[0]
     feature_importances = pd.Series(importances, index=X.columns)
+    feature_importances = feature_importances.apply(lambda x: max(x, 0))
     feature_importances = feature_importances.sort_values(ascending=True)
-    #feature_importances = feature_importances[feature_importances >= 0]
 
     feature_importances_fig = px.bar(feature_importances, x=feature_importances.values, y=feature_importances.index,
                                      labels={'x': 'Importance', 'y': 'Feature'},
@@ -496,6 +460,13 @@ def train(df_filtered, df_train, target, selected_features):
     # print(f"F1 Score {f1_score(y_test, y_pred, average='macro')}")
     # print(f"Accuracy {accuracy_score(y_test, y_pred)}")
     return X, clf, X_test, y_test
+
+# counterfactual helper functions
+def update_counterfactual_dropdown(value):
+    # Set value to list if not already
+    if isinstance(value, str):
+        value = [value]
+    return [{'label': v, 'value': v} for v in value if v in mutable_features]
 
 def get_counterfactuals_from_model(X: pd.DataFrame, y: pd.Series, model, features_to_vary, outcome_name: str, 
                                    idx = None, n_samples: int = 1, random_state: int = 0, total_CFs: int = 5, 
