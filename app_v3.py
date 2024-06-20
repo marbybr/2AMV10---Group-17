@@ -380,8 +380,7 @@ def update_values(selected_features, filters, dropdown_value, hoverDataMap, drop
         'Value': sample_row.values.flatten()
     })
     plot_data['Color'] = ['red' if val < 0 else 'blue' for val in plot_data['Value']]
-    plot_data['Value'] = plot_data['Value'].abs()
-    plot_data = plot_data[plot_data['Value'] > 0]
+    plot_data = plot_data[plot_data['Value'].abs() > 0]
     plot_data = plot_data.sort_values(by=["Value"], ascending=True)
     plot_data = plot_data.reset_index(drop=True)
 
