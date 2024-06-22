@@ -1,28 +1,24 @@
 import numpy as np
-from dash import Dash, html, dash_table, dcc, callback, Output, Input
+from dash import Dash, html, dcc, callback, Output, Input
 import pandas as pd
-import matplotlib.pyplot as plt
 import geopandas as gpd
 import plotly.express as px
 import dash_bootstrap_components as dbc # Used for creating more advanced layouts
 import plotly.graph_objects as go
-import os
 from sklearn.model_selection import train_test_split
 from sklearn.linear_model import LogisticRegression
 import dice_ml
-from dice_ml import Dice
-from dice_ml.utils import helpers
 
-#Load the dataset
+# Load the dataset
 df = pd.read_csv('data_cleaned.csv')
  
-# Turn this categorical variable into binary variable
+# Turn the Mental_Health_History categorical variable into binary variable
 df["Mental_Health_History"] = df['Mental_Health_History'].map({'No': 0, 'Maybe': 0, 'Yes': 1})
     
-# Set default name for `Country` column
+# Set default name for the `Country` column
 COUNTRY_COL = "Country"
 
-# Get mutable and immutable features for counterfactual
+# Get mutable and immutable features for the counterfactual feature selection
 immutable_features = ['Australia_and_New_Zealand', 'Central_America', 'Eastern_Europe', 'Northern_America', 'Northern_Europe', 
                       'South_America', 'Southeastern_Asia', 'Southern_Africa', 'Southern_Asia', 'Southern_Europe', 'Western_Africa', 
                       'Western_Asia', 'Western_Europe', 'Female', 'family_history', 'Mental_Health_History']
@@ -30,14 +26,14 @@ immutable_features = ['Australia_and_New_Zealand', 'Central_America', 'Eastern_E
 mutable_features = [feature for feature in df.columns if feature not in immutable_features if feature != 'treatment' 
                     if feature not in ['Timestamp', "Country"]]
 
-#Initialize the app and incorporate a Dash Bootstrap theme
-external_stylesheets = [dbc.themes.SLATE] #[dbc.themes.BOOTSTRAP]
+# Initialize the app and incorporate a Dash Bootstrap theme
+external_stylesheets = [dbc.themes.SLATE]
 app = Dash(__name__, external_stylesheets=external_stylesheets)
 app.title = "Mental Health Dataset Analysis."
 
 # App layout
 app.layout = dbc.Container([
-    #Construct the title and subtitles
+    # Construct the title and subtitles
     dbc.Row([
         html.Div('2AMV10, group 17: Mental Health Dataset Analysis', style={
             'fontSize': '15px', 
@@ -47,6 +43,7 @@ app.layout = dbc.Container([
         })
     ]),
 
+    # Construct the text above the 3 dropdown menus at the top of the dashboard
     dbc.Row([
         dbc.Col([
             html.Div('Independant variables selection')
@@ -59,41 +56,48 @@ app.layout = dbc.Container([
         ], width=4)
     ]),
 
-    #Construct the dropdown menu of all columns except for index, Timestamp and country, 
-    #set the 2nd column (so first after index and Timestamp) as the standard selected option
+    # Construct the three dropdown menus at the top of the dashboard
     dbc.Row([
+        # Construct the feature selection dropdown menu of all columns except for index, Timestamp and country, 
+        # set the 2nd column (so first after index and Timestamp) as the standard selected option
         dbc.Col([
             dcc.Dropdown(df.columns[1:].drop(['Country']), mutable_features[0], id='feature-dropdown', multi=True)
         ],width=4),
+
+        # Construct the target variable selection dropdown menu and set the standard to treatment
         dbc.Col([
             dcc.Dropdown(id='columns_dropdown',
                         options=[{'label': column, 'value': column} for column in df.columns if column not in ['Timestamp', "Country"]],
                         value='treatment',
                         style={'width':'100%'})
         ],width=4),
+
+        # Construct the filter selection dropdown menu
         dbc.Col([
             dcc.Dropdown([f"{col}{sign}" for col in df.columns[1:] for sign in [' = True', ' = False']], id='filter-dropdown', multi=True)
         ],width=4)
     ]),
 
-    #Construct a Row (visually speaking) with 3 columns, 1 for the map, 1 for the target distribution and 1 for the feature distribution
+    # Display the worldmap plot, the  Histogram for target distribution and the feature distribution plot next to each other
     dbc.Row([
+
         dbc.Col([
-            #html.Br(),
             dcc.Graph(id='percentages_map', clear_on_unhover=True, style={'height': '70vh'})
-            ], width=7),  # Map  
+            ], width=7),  # Worldmap plot  
 
         dbc.Col([
             dcc.Graph(id='country_barplot', clear_on_unhover=True, style={'height': '50vh'})
-            ], width=2),  # Histogram
+            ], width=2),  # Histogram for target distribution
          
         dbc.Col([
             dcc.Graph(figure={}, id='feature-distribution')
-            ], width=3)   #Histogram for the selected feature
+            ], width=3)   # Feature selection plot
     ]),
 
-    # Training and counterfactuals explanations
+    # Display the Training button, the feature importance plot, the dropdown menu for counteractual 
+    # feature selection and the counterfactuals plot
     dbc.Row([
+
         # Button to train the model and display feature importances
         dbc.Col([
             dbc.Button("Train Selected Features", id='train_button', color="primary", className="mr-2"),
@@ -104,7 +108,6 @@ app.layout = dbc.Container([
         dbc.Col([
             dcc.Dropdown(id="counterfactuals_dd",
                          multi=True),
-
             dcc.Graph(id="cf_barplot", style={'height': '60vh'})
         ], width=6)
     ]),
@@ -117,29 +120,52 @@ app.layout = dbc.Container([
 )
 
 def update_counterfactual_dropdown(value):
+    """Updates the possible features that can be selected in the dropdown menu for counterfactual feature selection
+
+    Parameter:
+    value: a list that contains the features that can be selected for the counterfactuals
+
+    Returns a dictionary containing the labels and values of the mutable features
+    """
     # Set value to list if not already
     if isinstance(value, str):
         value = [value]
     return [{'label': v, 'value': v} for v in value if v in mutable_features]
 
-#Builds interaction between the table, filters, bar charts and world map
+# Build interaction between the remaining components
 @app.callback(
-    Output(component_id='feature-distribution', component_property='figure'),
-    Output(component_id='percentages_map', component_property='figure'),
-    Output(component_id="country_barplot", component_property="figure"),
-    Output(component_id='feature_importances', component_property='figure'),
-    Output(component_id='cf_barplot', component_property='figure'),
-    Input(component_id='feature-dropdown', component_property='value'),
-    Input(component_id='filter-dropdown', component_property='value'),
-    Input(component_id='columns_dropdown', component_property='value'),
-    Input(component_id="percentages_map", component_property="hoverData"),
-    Input(component_id='columns_dropdown', component_property='value'),
-    Input(component_id='train_button', component_property='n_clicks'),
-    Input(component_id='counterfactuals_dd', component_property='value')
+    Output(component_id='feature-distribution', component_property='figure'), # Feature distribution plot, top right on dashboard
+    Output(component_id='percentages_map', component_property='figure'), # Worldmap plot, top left on dashboard
+    Output(component_id="country_barplot", component_property="figure"), # Target variable distribution plot, top center on dashboard
+    Output(component_id='feature_importances', component_property='figure'), # Feature importance plot for logistic regression model, buttom left on dashboard
+    Output(component_id='cf_barplot', component_property='figure'), # Counterfactual plot, buttom right on dashboard
+    Input(component_id='feature-dropdown', component_property='value'), # Dropdown menu to select which features to train with, top left on dashboard
+    Input(component_id='filter-dropdown', component_property='value'), # Dropdown menu to select filter(s), top right on dashboard
+    Input(component_id='columns_dropdown', component_property='value'), # Dropdown menu to select the target variable, top centre on dashboard
+    Input(component_id="percentages_map", component_property="hoverData"), # Worldmap plot, top left on dashboard
+    Input(component_id='train_button', component_property='n_clicks'), # Button that starts logistic regression training, button left on dashboard
+    Input(component_id='counterfactuals_dd', component_property='value') # Dropdown menu to select features for counterfactualsm buttom right on dashboard
 )
-def update_values(selected_features, filters, dropdown_value, hoverDataMap, dropdown_value_hist, selected_n_clicks,
-                  cf_features):
+def update_values(selected_features, filters, dropdown_value, hoverDataMap, selected_n_clicks, cf_features):
+    """Constructs all plots using inputs from the dropdown menus
+    
+    Parameters:
 
+    selected_features: list of feature(s) to train with
+    filters: list of filter(s)
+    dropdown_value: string of the target variable
+    hoverDataMap: value that represents the country that the user is hovering their mouse over in the worldmap plot
+    selected_n_clicks: value that represents whether the button to train the model has been clicked by the user
+    cf_features: list of features to calculate the counterfactuals with
+    
+    Returns:
+    fig: Barchart that shows the distributions of the features used to train the model
+    fig2: Worldmap plot
+    fig3: Histogram to show the target variable distribution for the country that was clicked last
+    feature_importances_fig: 
+    fig_cf
+
+    """
     #Generate the text message that shows which features were selected
     if type(selected_features) == str:
         selected_features = [selected_features]
@@ -214,7 +240,7 @@ def update_values(selected_features, filters, dropdown_value, hoverDataMap, drop
         barmode='stack',
         title=dict(
             text="Distributions of selected features",
-            font=dict(size=15), 
+            font=dict(size=10), 
             automargin=True, 
             yref='container',
             y=0.95
@@ -276,22 +302,22 @@ def update_values(selected_features, filters, dropdown_value, hoverDataMap, drop
 
     fig3 = px.histogram(
         data_frame=data, 
-        x=dropdown_value_hist, 
-        color=dropdown_value_hist,
+        x=dropdown_value, 
+        color=dropdown_value,
         hover_name=COUNTRY_COL, 
-        hover_data=[COUNTRY_COL, dropdown_value_hist],
+        hover_data=[COUNTRY_COL, dropdown_value],
         color_discrete_map={True: 'blue', False: 'red'}
     )
     fig3.update_layout(
         title=dict(
-            text=f"{dropdown_value_hist} in {country}",
+            text=f"{dropdown_value} in {country}",
             font=dict(size=10), 
             automargin=True, 
             yref='container',
             y=0.95
         ), 
         xaxis_title=dict(
-            text=f"{dropdown_value_hist}",
+            text=f"{dropdown_value}",
             font=dict(size=16)
         ),
         yaxis_title=dict(
@@ -299,7 +325,7 @@ def update_values(selected_features, filters, dropdown_value, hoverDataMap, drop
             font=dict(size=16)
         ),
         legend_title=dict(
-            text=f"{dropdown_value_hist}",
+            text=f"{dropdown_value}",
             font=dict(size=16)
         ),
         plot_bgcolor='rgba(0, 0, 0, 0)',
@@ -480,8 +506,7 @@ def get_counterfactuals_from_model(X: pd.DataFrame, y: pd.Series, model, feature
     """
     Generates counterfactual explanations using the dice_ml package.
 
-    Parameters
-    ----------
+    Parameters:
     X: pd.DataFrame 
         A dataframe containing the train data
     y: pd.Series 
@@ -510,8 +535,7 @@ def get_counterfactuals_from_model(X: pd.DataFrame, y: pd.Series, model, feature
         Desired counterfactual class - can take 0 or 1. Default value
             is "opposite" to the outcome class of query_instance for binary classification.
     
-    Returns
-    -------
+    Returns:
     cf: dice_ml.counterfactual_explanations.CounterfactualExplanations
         A CounterfactualExplanations object that contains the list of
             counterfactual examples per query_instance as one of its attributes.
