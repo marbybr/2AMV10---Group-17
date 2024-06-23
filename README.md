@@ -26,7 +26,7 @@ For more information regarding the used dataset, [click here](https://www.kaggle
 pip install numpy, pandas, geopandas, plotly, dash, dash_bootstrap_components, scikit-learn, dice-ml
 ```
 
-## Running the code
+## Running the Code
 In order to run the code, open `app.py` in Visual Studio Code or another IDE of your choice. <br>
 After installing the dependencies, execute the following command in the terminal to run the code:
 ```sh
@@ -34,7 +34,7 @@ python .\app.py
 ```
 This will yield a URL that leads to the dashboard where the user can interact with the dataset and the visualizations
 
-## Interacting with the dashboard
+## Interacting with the Dashboard
 There are 3 ways to interact with the dashboard:<br>
 1. Use one of the four dropdown menus to customize:<br>
    - The features that are used to train the logistic regression model.
