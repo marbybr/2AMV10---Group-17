@@ -49,7 +49,7 @@ There are 3 ways to interact with the dashboard:<br>
 
 ## Example
 The following input was provided to obtain the visualizations shown in the video. 
-- **Independant variables**: `self_employed`, `Female`, `family_history`, `Coping_Struggles`, `Occupation_Business`
+- **Independent variables**: `self_employed`, `Female`, `family_history`, `Coping_Struggles`, `Occupation_Business`
 - **Target variable**: `treatment`
 - **Filters**: None
 - **Features used to construct the counterfactuals**: `self_employed`, `Coping_Struggles`, `Occupation_Business`
