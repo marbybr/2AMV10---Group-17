@@ -23,7 +23,7 @@ For more information regarding the used dataset, [click here](https://www.kaggle
 
 **Install the dependencies by executing the following command in the terminal of your IDE of choice**:
 ```sh
-pip install numpy, pandas, matplotlib, geopandas, plotly, dash, dash_bootstrap_components, scikit-learn, dice-ml
+pip install numpy, pandas, geopandas, plotly, dash, dash_bootstrap_components, scikit-learn, dice-ml
 ```
 
 ## Running the code
