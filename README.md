@@ -28,7 +28,7 @@ pip install numpy, pandas, geopandas, plotly, dash, dash_bootstrap_components, s
 
 ## Running the code
 In order to run the code, open `app.py` in Visual Studio Code or another IDE of your choice. <br>
-After installing the dependencies, execute the following command to run the code:
+After installing the dependencies, execute the following command in the terminal to run the code:
 ```sh
 python .\app.py
 ```
