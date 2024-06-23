@@ -1,11 +1,11 @@
 # 2AMV10, Group-17
 This project involves the development of a visual analytics tool based on the Dash library to allow for interactive visualization. The project includes the following tasks:
-- Loading our selected dataset regarding mental health into the `data_preperation.ipynb` notebook
-- Pre-processing the dataset
-- Saving the pre-processed dataset as `data_cleaned.csv`
-- Loading the cleaned data into `app.py`
-- Filtering the data based on user-selected values in the dropdown menus
-- creating a logistic regression model and using the filtered dataset and the model in combination with multiple dropdown menus to visualize the data and model that the user is interested in
+- Loading our selected dataset regarding mental health into the `data_preperation.ipynb` notebook.
+- Pre-processing the dataset.
+- Saving the pre-processed dataset as `data_cleaned.csv`.
+- Loading the cleaned data into `app.py`.
+- Filtering the data based on user-selected values in the dropdown menus.
+- creating a logistic regression model and using the filtered dataset and the model in combination with multiple dropdown menus to visualize the data and model that the user is interested in.
 
 For more information regarding the used dataset, [click here](https://www.kaggle.com/datasets/bhavikjikadara/mental-health-dataset)
 
@@ -13,8 +13,9 @@ For more information regarding the used dataset, [click here](https://www.kaggle
 
 - **`app.py`**: Our main code. This script creates our Dashboard and the visualizations.
 - **`data_preperation.ipynb`**: Loads and pre-processes `Mental Health Dataset.csv`, creates and saves `data_cleaned.csv`. <br>
-  **NOTE**: Since `data_cleaned.csv` is already present in this folder, there is no need to run this notebook. We submitted this notebook for completeness sake
-- **`data_exploration.ipynb`**: 
+  **NOTE**: Since `data_cleaned.csv` is already present in this folder, there is no need to run this notebook. We submitted this notebook for completeness sake.
+- **`data_exploration.ipynb`**: Loads `Mental Health Dataset.csv` and performs EDA methods on the dataset. <br>
+  **NOTE**: This notebook does not need to be run to construct our visualization tool. We submitted this notebook since it was used to contruct figures that were used in our report.
 - **`Mental Health Dataset.csv`**: The initial dataset before any pre-processing took place.
 - **`data_cleaned.csv`**: The dataset after pre-processing has taken place.
 
