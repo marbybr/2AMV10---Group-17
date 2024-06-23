@@ -1,4 +1,4 @@
-# 2AMV10, Group-17
+# 2AMV10, Group 17
 This project involves the development of a visual analytics tool based on the Dash library to allow for interactive visualization. The project includes the following tasks:
 - Loading our selected dataset regarding mental health into the `data_preperation.ipynb` notebook.
 - Pre-processing the dataset.
